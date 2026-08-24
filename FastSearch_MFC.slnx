@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="FastSearch_MFC.vcxproj" Id="caf865d9-3ec6-4390-9ec3-c84a7daad156" />
+</Solution>
