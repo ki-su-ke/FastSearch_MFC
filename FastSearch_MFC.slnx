@@ -3,5 +3,7 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
+  <Project Path="FastSearchApp_MFC/FastSearchApp_MFC.vcxproj" />
   <Project Path="FastSearch_MFC.vcxproj" Id="caf865d9-3ec6-4390-9ec3-c84a7daad156" />
+  <Project Path="FileSearchEngine/FileSearchEngine.vcxproj" Id="63192d44-d2e7-492a-bf47-4e2ccb5d0f05" />
 </Solution>
