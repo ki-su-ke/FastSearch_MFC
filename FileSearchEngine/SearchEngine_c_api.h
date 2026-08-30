@@ -17,8 +17,11 @@ typedef void* SearchEngineHandle;
 
 // 1項目分の情報
 struct SearchResultItem {
+	const wchar_t* fileName;	// ファイル名のみ (フルパスではない)
     const wchar_t* filePath;
 	unsigned long long fileSize;	// 64ビットファイルサイズ (4GB超対応)
+	unsigned long long lastWriteTime; // ファイルのタイムスタンプ情報 環境に依存しない unsigned long long
+	unsigned long long creationTime;  // ファイルの作成日時 環境に依存しない unsigned long long
 };
 
 // 検索結果をまとめた構造体

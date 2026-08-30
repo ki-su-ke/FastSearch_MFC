@@ -12,6 +12,7 @@
 #define MFT_ROOT 5 // MFTのルートディレクトリの定義値（NTFS仕様上、ルートは5番）
 
 
+///////////////////////////////////////////////////////////
 // MFTレコード情報を保持する構造体
 struct FileRecord {
 	DWORDLONG dwFileId;      // ファイルID
@@ -20,10 +21,14 @@ struct FileRecord {
 	ULONGLONG ullFileSize;   // ファイルサイズ
 };
 
-// 検索結果として返す構造体u
+//////////////////////////////////////////////////////////////
+// 検索結果として返す構造体
 struct SearchResult {
-	std::wstring wsFileName; // ファイル名
-	std::wstring wsFullPath; // フルパス
+	std::wstring wsFileName;	// ファイル名
+	std::wstring wsFullPath;	// フルパス
+	FILETIME ftCreationTime;	// 作成日時
+	FILETIME ftLastWriteTime;	// 最終更新日時
+	ULONGLONG ullFileSize;		// ファイルサイズ
 	//
 	// コンストラクタを用意しておく
 	//
@@ -31,11 +36,25 @@ struct SearchResult {
 	SearchResult() = default;
 	//
 	// ムーブ対応コンストラクタ
-	SearchResult(std::wstring name, std::wstring path)
-		: wsFileName(std::move(name)), wsFullPath(std::move(path)) {}
+	SearchResult(std::wstring name, std::wstring path, FILETIME createTime, FILETIME lastWrwiteTime, ULONGLONG fileSize)
+		: wsFileName(std::move(name)),
+		  wsFullPath(std::move(path)),
+		  ftCreationTime(createTime),
+		  ftLastWriteTime(lastWrwiteTime),
+		  ullFileSize(fileSize) {}
+};
+
+////////////////////////////////////////////////////////////
+// 属性情報を一元取得するヘルパー構造体
+struct FileExtraInfo {
+	ULONGLONG ullFileSize = 0;
+	FILETIME ftCreationTime = { 0, 0 };
+	FILETIME ftLastWriteTime = { 0, 0 };
 };
 
 
+///////////////////////////////////////////////////////////
+// FastSearchEngine クラスの定義
 class FastSearchEngine {
 private:
 	std::vector<FileRecord> m_records; // インデックスを保持するベクター
@@ -45,7 +64,8 @@ private:
 
 
 public:
-	FastSearchEngine() = default;
+	//FastSearchEngine() = default;
+	FastSearchEngine();
 	~FastSearchEngine() = default;
 
 	// 指定したドライブ(ex. L"C:")のUSNジャーナルを一括走査してインデックスを構築する
@@ -84,4 +104,7 @@ private:
 	// ワイルドカード検索用の補助関数
 	// 例: "*.txt" のようなワイルドカードパターンにマッチするかどうかを判定する
 	bool MatchesPattern(const std::wstring& fileName, const std::wstring& pattern);
+
+	// ファイルの属性情報を取得する補助関数
+	FileExtraInfo GetFileExtraInfo(const std::wstring& filePath);
 };

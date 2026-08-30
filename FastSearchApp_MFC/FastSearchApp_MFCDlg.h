@@ -58,6 +58,13 @@ private:
 public:
 	void ClearSearchResults(); // 検索結果リストをクリア
 
+private:
+	
+	CString FileTimeToString(const FILETIME& ft);	// FILETIME を "YYYY/MM/DD HH:MM:SS" の CString に変換する
+	CString Format64BitTime(ULONGLONG ullRawTime);	// 64bit時間を "YYYY/MM/DD HH:MM:SS" の CString に変換する
+	// C ABI 境界を超えて呼び出すために、環境に依存しない64bit整数で時間を扱っているので2段階で変換する
+	// Format64BitTime() の内部で FileTimeToString() を呼び出して文字列を返す
+
 protected:
 	HICON m_hIcon;
 

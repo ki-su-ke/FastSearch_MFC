@@ -160,12 +160,16 @@ BOOL CFastSearchAppMFCDlg::OnInitDialog()
 void CFastSearchAppMFCDlg::InitControls()
 {
 	// リストコントロールの拡張スタイルとカラム（列）設定
+	m_listSearchResult.ModifyStyle(LVS_TYPEMASK, LVS_REPORT);
 	m_listSearchResult.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
-	//m_listSearchResult.InsertColumn(0, L"ファイル名", LVCFMT_LEFT, 200);
-	//m_listSearchResult.InsertColumn(1, L"ファイルパス", LVCFMT_RIGHT, 450);
-	m_listSearchResult.InsertColumn(0, L"ファイルパス", LVCFMT_LEFT, 550);
-	m_listSearchResult.InsertColumn(1, L"ファイルサイズ", LVCFMT_RIGHT, 100);
-
+	//m_listSearchResult.InsertColumn(0, L"ファイル名", LVCFMT_RIGHT, 100);
+	//m_listSearchResult.InsertColumn(1, L"ファイルパス", LVCFMT_LEFT, 550);
+	m_listSearchResult.InsertColumn(0, L"ファイル名",     LVCFMT_LEFT,  200);
+    m_listSearchResult.InsertColumn(1, L"サイズ",         LVCFMT_RIGHT, 100);
+    m_listSearchResult.InsertColumn(2, L"更新日時",       LVCFMT_LEFT,  140);
+    m_listSearchResult.InsertColumn(3, L"作成日時",       LVCFMT_LEFT,  140);
+    m_listSearchResult.InsertColumn(4, L"フルパス",       LVCFMT_LEFT,  400);
+	
 	// ドライブコンボボックスの初期化（ひとまず C: ドライブをセット）
 	m_cmbTargetDir.AddString(L"C:");
 	m_cmbTargetDir.SetCurSel(0);
@@ -295,12 +299,27 @@ void CFastSearchAppMFCDlg::OnBnClickedButtonSearch()
 	// 結果を CListCtrl に流し込み
 	for (int i = 0; i < results.count; ++i) {
 		// 第1列: ファイル名 (検索結果の構造体から取得)
-		int index = m_listSearchResult.InsertItem(i, results.items[i].filePath);
+		int index = m_listSearchResult.InsertItem(i, results.items[i].fileName);
+		//
+		// 第2列: ファイルフルパス
+		//m_listSearchResult.SetItemText(index, 1, results.items[i].filePath);
 		//
 		// 第2列: ファイルサイズ
 		CString strSize;
 		strSize.Format(L"%llu", results.items[i].fileSize);
 		m_listSearchResult.SetItemText(index, 1, strSize);
+		//
+		// 第3列: 更新日時
+		//CString strUpdateTime = FileTimeToString(results.items[i].ftLastWriteTime);
+		CString strUpdateTime = Format64BitTime(results.items[i].lastWriteTime);
+		m_listSearchResult.SetItemText(index, 2, strUpdateTime);
+		//
+		// 第4列: 作成日時
+		CString strCreationTime = Format64BitTime(results.items[i].creationTime);
+		m_listSearchResult.SetItemText(index, 3, strCreationTime);
+		//
+		// 第5列: フルパス
+		m_listSearchResult.SetItemText(index, 4, results.items[i].filePath);
 		//
 		// ソート用の文字列を確保してベクターに保持する
 		// ラムダ構造体のおかげで、普通に new するときみたいに1引数で書ける！
@@ -423,3 +442,42 @@ void CFastSearchAppMFCDlg::ClearSearchResults()
 	//　あと、CListCtrlのプロパティでは、「並び変え」を無効にしておくこと。
 	// CListCtrlの内部でソートが走ると、vectorがまだ用意されていない状態でLPARAMが参照されてしまうので、クラッシュする。
 }
+
+
+// FILETIME を "YYYY/MM/DD HH:MM:SS" の CString に変換する処理例
+CString CFastSearchAppMFCDlg::FileTimeToString(const FILETIME& ft) {
+
+	if (ft.dwLowDateTime == 0 && ft.dwHighDateTime == 0)
+		return L"";
+
+	// UTC時間からローカル時間に変換
+	FILETIME ftLocal;
+	FileTimeToLocalFileTime(&ft, &ftLocal);
+
+	SYSTEMTIME st;
+	FileTimeToSystemTime(&ftLocal, &st);
+
+	CString strText;
+	//strText.Format(L"%04d/%02d/%02d %02d:%02d:%02d", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+	//
+	// 秒はいらないか
+	strText.Format(L"%04d/%02d/%02d %02d:%02d", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute);
+
+	return strText;
+}
+
+// 64bit 整数から FILETIME へ復元して文字列化するヘルパー
+CString CFastSearchAppMFCDlg::Format64BitTime(ULONGLONG ullRawTime) {
+	if (ullRawTime == 0)
+		return L"";
+
+	ULARGE_INTEGER ulTime;
+	ulTime.QuadPart = ullRawTime;
+
+	FILETIME ft;
+	ft.dwLowDateTime = ulTime.LowPart;
+	ft.dwHighDateTime = ulTime.HighPart;
+
+	return FileTimeToString(ft);
+}
+
