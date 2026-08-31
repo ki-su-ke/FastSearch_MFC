@@ -204,6 +204,8 @@
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="CSplashDlg.h" />
+    <ClInclude Include="CustomMessage.h" />
     <ClInclude Include="FastSearchApp_MFC.h" />
     <ClInclude Include="FastSearchApp_MFCDlg.h" />
     <ClInclude Include="framework.h" />
@@ -212,6 +214,7 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CSplashDlg.cpp" />
     <ClCompile Include="FastSearchApp_MFC.cpp" />
     <ClCompile Include="FastSearchApp_MFCDlg.cpp" />
     <ClCompile Include="pch.cpp">

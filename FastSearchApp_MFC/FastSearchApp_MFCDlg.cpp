@@ -4,11 +4,12 @@
 
 #include "pch.h"
 #include "framework.h"
+#include "afxdialogex.h"
+#include "shellapi.h"
+
 #include "FastSearchApp_MFC.h"
 #include "FastSearchApp_MFCDlg.h"
-#include "afxdialogex.h"
-
-#include "shellapi.h"
+#include "CustomMessage.h"
 
 
 #ifdef _DEBUG
@@ -116,6 +117,7 @@ BEGIN_MESSAGE_MAP(CFastSearchAppMFCDlg, CDialogEx)
 	ON_NOTIFY(NM_DBLCLK, IDC_LIST_SEARCHRESULT, &CFastSearchAppMFCDlg::OnNMDblclkListSearchresult)
 	ON_NOTIFY(NM_RCLICK, IDC_LIST_SEARCHRESULT, &CFastSearchAppMFCDlg::OnNMRClickListSearchresult)
 	ON_NOTIFY(LVN_COLUMNCLICK, IDC_LIST_SEARCHRESULT, &CFastSearchAppMFCDlg::OnLvnColumnclickListSearchresult)
+	ON_MESSAGE(WMU_INDEX_COMPLETE, &CFastSearchAppMFCDlg::OnIndexComplete)
 END_MESSAGE_MAP()
 
 
@@ -152,7 +154,9 @@ BOOL CFastSearchAppMFCDlg::OnInitDialog()
 
 	// TODO: 初期化をここに追加します。
 	InitControls(); // コントロールの初期化
-	InitSearchEngine(); // 検索エンジンの初期化
+	//InitSearchEngine(); // 検索エンジンの初期化
+	InitSearchEngineAsync(); // 検索エンジンの初期化を非同期で行う
+	
 
 	return TRUE;  // フォーカスをコントロールに設定した場合を除き、TRUE を返します。
 }
@@ -189,6 +193,79 @@ void CFastSearchAppMFCDlg::InitSearchEngine()
 		AfxMessageBox(_T("検索エンジンの初期化に失敗しました。"));
 	}
 }
+
+// 検索エンジンの初期化を非同期で行う
+void CFastSearchAppMFCDlg::InitSearchEngineAsync()
+{
+	// スプラッシュ画面をモードレス (Create) で表示
+	m_pSplashDlg = new CSplashDlg(this);
+	m_pSplashDlg->Create(CSplashDlg::IDD, this);
+	m_pSplashDlg->ShowWindow(SW_SHOW);
+	m_pSplashDlg->CenterWindow();
+
+	// メインウィンドウの操作を一時的に無効化（または非表示）
+	EnableWindow(FALSE);
+
+	// インデックス構築用ワーカースレッドを起動
+	HWND hMainWnd = m_hWnd;
+	HWND hSplashWnd = m_pSplashDlg->m_hWnd;
+
+	m_initThread = std::thread([this, hMainWnd, hSplashWnd]() {
+			// スプラッシュ側に「処理開始」のメッセージを送る（固定文字列なら delete 不要）
+			::PostMessage(hSplashWnd, WMU_INDEX_PROGRESS, 10, (LPARAM)L"検索エンジンを初期化中...");
+
+			// SearchEngineを初期化
+			SearchEngineHandle hEngine = Engine_Create();
+			bool success = false;
+
+			if (hEngine != nullptr) {
+				//
+				// Engine_BuildIndex() を呼び出してインデックス構築
+				::PostMessage(hSplashWnd, WMU_INDEX_PROGRESS, 30, (LPARAM)L"USNジャーナルをスキャン中...");
+				if (Engine_BuildIndex(hEngine, L"C:")) {
+					success = true;
+					::PostMessage(hSplashWnd, WMU_INDEX_PROGRESS, 100, (LPARAM)L"準備完了");
+				}
+			}
+
+			// メインウィンドウに完了通知を送る
+			// wParam に成功フラグ、lParam に hEngine のポインタを渡す
+			::PostMessage(hMainWnd, WMU_INDEX_COMPLETE, (WPARAM)(success ? 1 : 0), (LPARAM)hEngine);
+		});
+	//
+	// スレッドの所有権を切り離す（または Destructor で join する）
+	m_initThread.detach();
+}
+
+// バックグラウンドスレッドから完了通知を受けた時
+LRESULT CFastSearchAppMFCDlg::OnIndexComplete(WPARAM wParam, LPARAM lParam)
+{
+	bool isSuccess = (wParam == 1);
+	SearchEngineHandle hEngine = reinterpret_cast<SearchEngineHandle>(lParam);
+
+	// スプラッシュ画面を破棄
+	if (m_pSplashDlg) {
+		m_pSplashDlg->DestroyWindow();
+		delete m_pSplashDlg;
+		m_pSplashDlg = nullptr;
+	}
+
+	// メインウィンドウを有効化し、フォーカスをコンボへ
+	EnableWindow(TRUE);
+	m_cmbTargetDir.SetFocus();
+
+	if (isSuccess) {
+		m_hSearchEngine = hEngine;
+	} else {
+		if (hEngine) {
+			Engine_Destroy(hEngine); // 失敗時は破棄
+		}
+		AfxMessageBox(L"USN インデックスの構築に失敗しました。\n管理者権限で実行されているか確認してください。");
+	}
+	
+	return 0;
+}
+
 
 void CFastSearchAppMFCDlg::OnSysCommand(UINT nID, LPARAM lParam)
 {
@@ -250,6 +327,12 @@ void CFastSearchAppMFCDlg::OnDestroy()
 	CDialogEx::OnDestroy();
 
 	// TODO: ここにメッセージ ハンドラー コードを追加します。
+	if (m_pSplashDlg) {
+		m_pSplashDlg->DestroyWindow();
+		delete m_pSplashDlg;
+		m_pSplashDlg = nullptr;
+	}
+
 	ReleaseSearchEngine();
 }
 

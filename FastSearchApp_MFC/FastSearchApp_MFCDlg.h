@@ -6,8 +6,10 @@
 
 #include <vector>
 #include <memory>
+#include <thread>
 
 #include "SearchEngine_c_api.h"
+#include "CSplashDlg.h"
 
 /////////////////////////////////////////////////////////////////////////////
 // ソート条件を比較関数に渡すための構造体
@@ -53,6 +55,8 @@ private:
 
 	std::vector<WcharUniquePtr> m_sortTexts; // ソート用に確保した文字列を保持するベクター
 
+	CSplashDlg* m_pSplashDlg = nullptr; // スプラッシュダイアログ
+	std::thread m_initThread; // 初期化スレッド
 
 // 実装
 public:
@@ -72,6 +76,7 @@ protected:
 
 	void InitControls(); // コントロールの初期化
 	void InitSearchEngine(); // 検索エンジンの初期化
+	void InitSearchEngineAsync(); // 検索エンジンの初期化を非同期で行う
 
 	void ReleaseSearchEngine(); // 検索エンジンの解放
 
@@ -82,6 +87,7 @@ protected:
 	afx_msg HCURSOR OnQueryDragIcon();
 	afx_msg void OnNMDblclkListSearchresult(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnNMRClickListSearchresult(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg LRESULT OnIndexComplete(WPARAM wParam, LPARAM lParam); // インデックス作成完了通知ハンドラ
 	DECLARE_MESSAGE_MAP()
 public:
 	afx_msg void OnCbnSelchangeCombo1();
