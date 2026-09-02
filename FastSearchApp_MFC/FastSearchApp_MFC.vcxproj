@@ -205,7 +205,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CSplashDlg.h" />
-    <ClInclude Include="CustomMessage.h" />
+    <ClInclude Include="CustomMessages.h" />
     <ClInclude Include="FastSearchApp_MFC.h" />
     <ClInclude Include="FastSearchApp_MFCDlg.h" />
     <ClInclude Include="framework.h" />

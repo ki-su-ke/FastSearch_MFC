@@ -17,5 +17,6 @@
   <ItemGroup>
     <None Include="README.md" />
     <None Include=".github\purpose.md" />
+    <None Include=".github\copilot-instructions.md" />
   </ItemGroup>
 </Project>

@@ -6,7 +6,7 @@
 #include "afxdialogex.h"
 #include "CSplashDlg.h"
 
-#include "CustomMessage.h"
+#include "CustomMessages.h"
 
 
 // CSplashDlg ダイアログ
