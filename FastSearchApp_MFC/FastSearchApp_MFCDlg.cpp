@@ -685,7 +685,7 @@ void CFastSearchAppMFCDlg::OnNMDblclkListSearchresult(NMHDR* pNMHDR, LRESULT* pR
 		return ;
 
 	// 第1列（インデックス0）からフルパスを取得
-	CString strFullPath = m_listSearchResult.GetItemText(nItem, 0);
+	CString strFullPath = m_listSearchResult.GetItemText(nItem, 4);
 	if (strFullPath.IsEmpty())
 		return ;
 
@@ -709,7 +709,8 @@ void CFastSearchAppMFCDlg::OnNMRClickListSearchresult(NMHDR* pNMHDR, LRESULT* pR
 	if (nItem == -1)
 		return ;
 
-	CString strFullPath = m_listSearchResult.GetItemText(nItem, 1);
+	// フルパスを取得
+	CString strFullPath = m_listSearchResult.GetItemText(nItem, 4);
 	if (strFullPath.IsEmpty())
 		return ;
 
