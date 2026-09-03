@@ -139,6 +139,11 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <None Include=".github\copilot-instructions.md" />
+    <None Include=".github\purpose.md">
+      <SubType>
+      </SubType>
+    </None>
     <None Include="README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

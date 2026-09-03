@@ -6,8 +6,12 @@
 
 #include <vector>
 #include <memory>
+#include <thread>
+#include <mutex>
+#include <string>
 
 #include "SearchEngine_c_api.h"
+#include "CSplashDlg.h"
 
 /////////////////////////////////////////////////////////////////////////////
 // ソート条件を比較関数に渡すための構造体
@@ -15,6 +19,15 @@ struct SortContext {
 	int nColumn;        // ソート対象の列番号 (0: フルパス, 1: サイズ)
 	bool bAscending;    // true: 昇順, false: 降順
 };
+
+//////////////////////////////////////////////////////////////////////////////
+// 検索結果を UI スレッドへ受け渡すためのコンテナ
+struct AsyncSearchResultPayload {
+	bool isSuccess = false;
+	std::vector<SearchResultItem> results;
+};
+
+
 
 //////////////////////////////////////////////////////////////////////////////
 // CFastSearchAppMFCDlg ダイアログ
@@ -53,31 +66,20 @@ private:
 
 	std::vector<WcharUniquePtr> m_sortTexts; // ソート用に確保した文字列を保持するベクター
 
+	CSplashDlg* m_pSplashDlg = nullptr; // スプラッシュダイアログ
+	std::jthread m_initThread; // 初期化スレッド（終了時に request_stop + join で寿命管理）
+	std::jthread m_searchThread; // 検索スレッド
+	std::mutex m_engineMutex; // m_hSearchEngine / m_currentLoadDrive へのアクセス保護（初期化・検索・解放）
 
 // 実装
-public:
-	void ClearSearchResults(); // 検索結果リストをクリア
-
 protected:
 	HICON m_hIcon;
 
 	SearchEngineHandle m_hSearchEngine = nullptr; // 検索エンジンハンドル
 
-	void InitControls(); // コントロールの初期化
-	void InitSearchEngine(); // 検索エンジンの初期化
+	std::wstring m_currentLoadDrive = L"";	// 現在インデックス構築済みのドライブ文字 (例: L"C:")
+	bool m_isSearching = false;             // 二重検索防止フラグ
 
-	void ReleaseSearchEngine(); // 検索エンジンの解放
-
-	// 生成された、メッセージ割り当て関数
-	virtual BOOL OnInitDialog();
-	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
-	afx_msg void OnPaint();
-	afx_msg HCURSOR OnQueryDragIcon();
-	afx_msg void OnNMDblclkListSearchresult(NMHDR* pNMHDR, LRESULT* pResult);
-	afx_msg void OnNMRClickListSearchresult(NMHDR* pNMHDR, LRESULT* pResult);
-	DECLARE_MESSAGE_MAP()
-public:
-	afx_msg void OnCbnSelchangeCombo1();
 	// ターゲットディレクトリの指定
 	CComboBox m_cmbTargetDir;
 	// 検索対象ディレクトリ参照ボタン
@@ -88,6 +90,42 @@ public:
 	CButton m_btnSearch;
 	// 検索結果表示リスト
 	CListCtrl m_listSearchResult;
+
+
+	DECLARE_MESSAGE_MAP()
+	void InitControls(); // コントロールの初期化
+	void InitSearchEngine(); // 検索エンジンの初期化
+	void InitSearchEngineAsync(); // 検索エンジンの初期化を非同期で行う
+
+	void ReleaseSearchEngine(); // 検索エンジンの解放
+
+	void ClearSearchResults(); // 検索結果リストをクリア
+	void DisplaySearchResults(const std::vector<SearchResultItem>& results); // 検索結果を CListCtrl に表示する
+
+	// 非同期検索の実行
+	void _AsyncSearch(const std::wstring& keyword, const std::wstring& targetPath);
+
+	CString FileTimeToString(const FILETIME& ft);	// FILETIME を "YYYY/MM/DD HH:MM" の CString に変換する
+	CString Format64BitTime(ULONGLONG ullRawTime);	// 64bit時間を "YYYY/MM/DD HH:MM" の CString に変換する
+	// C ABI 境界を超えて呼び出すために、環境に依存しない64bit整数で時間を扱っているので2段階で変換する
+	// Format64BitTime() の内部で FileTimeToString() を呼び出して文字列を返す
+
+	// ファイルサイズを人間が見やすい形式 (KB, MB) に変換
+	CString FormatFileSize(ULONGLONG sizeInBytes);
+
+
+	// 生成された、メッセージ割り当て関数
+	virtual BOOL OnInitDialog();
+	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
+	afx_msg void OnPaint();
+	afx_msg HCURSOR OnQueryDragIcon();
+	afx_msg void OnNMDblclkListSearchresult(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnNMRClickListSearchresult(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg LRESULT OnIndexComplete(WPARAM wParam, LPARAM lParam); // インデックス作成完了通知ハンドラ
+	afx_msg void OnCbnSelchangeCombo1();
+
+	// 検索完了メッセージの受け取り
+	afx_msg LRESULT OnSearchComplete(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnDestroy();
 	afx_msg void OnBnClickedButtonBrowse();
 	afx_msg void OnBnClickedButtonSearch();

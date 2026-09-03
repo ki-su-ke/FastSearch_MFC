@@ -136,3 +136,6 @@ ehthumbs.db
 
 # Folder config file
 Desktop.ini
+
+# github copilot dir
+.github/

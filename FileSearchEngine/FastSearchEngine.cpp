@@ -6,7 +6,14 @@
 #include <algorithm>
 #include <cwctype>
 #include <numeric>
+//#include <fileapi.h>
 
+#define PRESERVE_CAPACITY 100000 // 予想されるファイル数に応じて適切に調整
+
+FastSearchEngine::FastSearchEngine() {
+	m_records.reserve(PRESERVE_CAPACITY);
+	m_idToIndexMap.reserve(PRESERVE_CAPACITY);
+}
 
 bool FastSearchEngine::BuildIndex(const std::wstring& driveLetter) {
     m_records.clear();
@@ -124,7 +131,7 @@ bool FastSearchEngine::BuildIndex_2(const std::wstring& driveLetter) {
     std::wcout << L"[DLL Debug] Journal ID: " << usnData.UsnJournalID << L", NextUsn: " << usnData.NextUsn << std::endl;
 
 	// MFT一括読み込みの設定
-    // ★ 確実に全レコードを対象にするため LowUsn = 0, HighUsn = MaxUsn(NextUsn) に設定
+    // 確実に全レコードを対象にするため LowUsn = 0, HighUsn = MaxUsn(NextUsn) に設定
 	MFT_ENUM_DATA_V0 enumData{};
 	enumData.StartFileReferenceNumber = 0;
     enumData.LowUsn = 0;
@@ -158,18 +165,23 @@ bool FastSearchEngine::BuildIndex_2(const std::wstring& driveLetter) {
             
 
 			// USNレコードバージョンチェック (V2 / V3)
-            //if (precord->Header.MajorVersion == 2 || precord->Header.MajorVersion == 3) {
             if (precord->MajorVersion == 2 || precord->MajorVersion == 3) {
                 //std::wcout << L"[DLL Debug] USN Record MajorVersion: " << precord->MajorVersion << std::endl;
                 //
                 // ファイル名を取得
                 std::wstring fileName(precord->FileName, precord->FileNameLength / sizeof(WCHAR));
+                
+                
 
                 m_records.push_back({
                     precord->FileReferenceNumber,
                     precord->ParentFileReferenceNumber,
                     fileName
                 });
+
+                // 追加した位置（インデックス）を ID から引き出せるように Map に登録
+                // (push_back 直後なので、現在のサイズ - 1 がそのレコードのインデックス)
+                m_idToIndexMap[precord->FileReferenceNumber] = m_records.size() - 1;
             }
 
             dwRetBytes -= recordLength;
@@ -233,6 +245,30 @@ std::wstring FastSearchEngine::BuildFullPath(
     return driveLetter + L"\\" + path;
 }
 
+
+// ファイルの属性情報を取得する補助関数
+FileExtraInfo FastSearchEngine::GetFileExtraInfo(const std::wstring& filePath) {
+
+    FileExtraInfo info;
+    WIN32_FILE_ATTRIBUTE_DATA fad;
+
+    if (GetFileAttributesExW(filePath.c_str(), GetFileExInfoStandard, &fad)) {
+
+		// ファイルサイズ
+        LARGE_INTEGER size;
+        size.HighPart = fad.nFileSizeHigh;
+        size.LowPart = fad.nFileSizeLow;
+        info.ullFileSize = static_cast<ULONGLONG>(size.QuadPart);
+        //
+		// タイムスタンプ
+		info.ftCreationTime = fad.ftCreationTime;   // 作成日時
+		info.ftLastWriteTime = fad.ftLastWriteTime; // 最終更新日時
+    }
+
+    return info;
+}
+
+
 // 検索処理
 std::vector<SearchResult> FastSearchEngine::Search(
     const std::wstring& keyword,
@@ -267,9 +303,13 @@ std::vector<SearchResult> FastSearchEngine::Search(
             // フルパスを復元
 			std::wstring fullPath = GetFullPath(record.dwFileId, drivePrefix);
             //
-			// 指定フォルダ配下か判定 (前方一致)
+			// 復元されたフルパスが指定フォルダ（targetPrefix）配下にあるかチェック
             if(fullPath.length() >= targetPrefix.length()) {
                 if (_wcsnicmp(fullPath.c_str(), targetPrefix.c_str(), targetPrefix.length()) == 0) {
+                    //
+                    // 作成日時や更新日時といった補足的なファイル情報を取得する
+                    FileExtraInfo extraInfo = GetFileExtraInfo(fullPath);
+                    //
                     //SearchResult sresult;
 					//sresult.wsFileName = record.wsFileName;
 					//sresult.wsFullPath = fullPath;
@@ -279,7 +319,14 @@ std::vector<SearchResult> FastSearchEngine::Search(
                     // emplace_back()では一時オブジェクトを作らず、std::move を効かせて直接 vector に追加できる
 					// record.wsFileName は std::wstring なのでそのまま渡してムーブ
 					// fullPath は GetFullPath で生成されたローカル変数なのでstd::moveを付けてムーブ
-                    results.emplace_back(record.wsFileName, std::move(fullPath));
+                    //results.emplace_back(record.wsFileName, std::move(fullPath));
+                    results.emplace_back(
+                                record.wsFileName,
+                                std::move(fullPath),
+						        extraInfo.ftCreationTime,
+						        extraInfo.ftLastWriteTime,
+						        extraInfo.ullFileSize
+                            );
 
                     if (results.size() >= maxResults) {
 						break; // 指定上限件数に達したら即抜ける
@@ -384,4 +431,5 @@ std::wstring FastSearchEngine::GetFullPath(DWORDLONG dwFileId, const std::wstrin
 
     return fullPath;
 }
+
 
